@@ -42,32 +42,12 @@ private:
 class Filter
 {
 public:
-  Filter(const std::string & filter_name = "pointcloud_preprocessor_filter") : filter_name_(filter_name), logger_(filter_name_) {}
+  explicit Filter(const std::string & filter_name = "pointcloud_preprocessor_filter") : filter_name_(filter_name), logger_(filter_name_) {}
   
-  const std::string& GetFilterName() { return filter_name_; }
+  virtual ~Filter() = default;
+
+  const std::string& GetFilterName() const { return filter_name_; }
   
-  double GetDistance(PointCloud* pc, size_t index) {
-      if (pc->type() == PointType::XYZIR) {
-          double x = pc->points()[index * pc->pointSize() + 0];
-          double y = pc->points()[index * pc->pointSize() + 1];
-          double z = pc->points()[index * pc->pointSize() + 2];
-          return std::hypot(x, y, z);
-      }
-
-      return pc->points()[index * pc->pointSize() + 5];
-  }
-  
-  double GetAzimuth(PointCloud* pc, size_t index) {
-      if (pc->type() == PointType::XYZIR) {
-          double x = pc->points()[index * pc->pointSize() + 0];
-          double y = pc->points()[index * pc->pointSize() + 1];
-          return std::atan2(y, x);
-      }
-
-      return pc->points()[index * pc->pointSize() + 6];
-  }
-
-//   virtual PointCloud* Apply(PointCloud* pc) = 0; // потенциальная цтечка памяти
   virtual std::unique_ptr<PointCloud> Apply(const PointCloud& pc) = 0;
   
   virtual void SetParams(const FilterParametr& param) {
