@@ -1,6 +1,7 @@
 #include "crop_box_filter.hpp"
 
 #include <vector>
+#include <cstring>
 
 namespace pointcloud_preprocessor
 {
@@ -30,7 +31,7 @@ PointCloud* CropBoxFilter::Apply(PointCloud* pc)
                            point[1] > param_.min_y && point[1] < param_.max_y &&
                            point[0] > param_.min_x && point[0] < param_.max_x;
     if ((!param_.negative && point_is_inside) || (param_.negative && !point_is_inside)) {
-      memcpy(&output[output_size], &pc->points_[global_offset], pc->point_size_ * sizeof(double));
+      std::memcpy(&output[output_size], &pc->points_[global_offset], pc->point_size_ * sizeof(double));
       output_size += pc->point_size_;
       output_points_count += 1;
     }
