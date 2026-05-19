@@ -26,7 +26,7 @@ private:
 
 public:
   CropBoxFilter();
-  virtual PointCloud* Apply(PointCloud* pc);
+  virtual std::unique_ptr<PointCloud> Apply(const PointCloud& pc) override;
   virtual void SetParams(const FilterParametr& param);
 };
 }  // namespace pointcloud_preprocessor

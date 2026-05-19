@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <cstring>
+#include <memory>
+#include <cmath>
 
 namespace pointcloud_preprocessor
 {
@@ -10,39 +12,44 @@ CropBoxFilter::CropBoxFilter()
 {
 }
 
-PointCloud* CropBoxFilter::Apply(PointCloud* pc)
+std::unique_ptr<PointCloud> CropBoxFilter::Apply(const PointCloud& pc)
 {
   size_t output_size = 0, output_points_count = 0;
-  std::vector<double> output(pc->size_ * pc->point_size_);
+  std::vector<double> output(pc.size() * pc.pointSize());
 
-  for (size_t global_offset = 0; global_offset + pc->point_size_ <= pc->size_ * pc->point_size_;
-       global_offset += pc->point_size_) {
-    std::vector<double> point(3);
-    std::memcpy(&point[0], &pc->points_[global_offset + 0], sizeof(double));
-    std::memcpy(&point[1], &pc->points_[global_offset + 1], sizeof(double));
-    std::memcpy(&point[2], &pc->points_[global_offset + 2], sizeof(double));
+  const auto& points = pc.points();
+  size_t point_size = pc.pointSize();
+  size_t total_points = pc.size();
 
-    if (!std::isfinite(point[0]) || !std::isfinite(point[1]) || !std::isfinite(point[2])) {
+
+  for (size_t global_offset = 0; global_offset + point_size <= total_points * point_size;
+       global_offset += point_size) {
+
+    double x, y, z;
+
+    std::memcpy(&x, &points[global_offset + 0], sizeof(double));
+    std::memcpy(&y, &points[global_offset + 1], sizeof(double));
+    std::memcpy(&z, &points[global_offset + 2], sizeof(double));
+
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
       logger_.log("Ignoring point containing NaN values");
       continue;
     }
 
-    bool point_is_inside = point[2] > param_.min_z && point[2] < param_.max_z &&
-                           point[1] > param_.min_y && point[1] < param_.max_y &&
-                           point[0] > param_.min_x && point[0] < param_.max_x;
+    bool point_is_inside = x > param_.min_x && x < param_.max_x &&
+                           y > param_.min_y && y < param_.max_y &&
+                           z > param_.min_z && z < param_.max_z;
+
     if ((!param_.negative && point_is_inside) || (param_.negative && !point_is_inside)) {
-      std::memcpy(&output[output_size], &pc->points_[global_offset], pc->point_size_ * sizeof(double));
-      output_size += pc->point_size_;
+      std::memcpy(&output[output_size], &points[global_offset], point_size * sizeof(double));
+      output_size += point_size;
       output_points_count += 1;
     }
   }
 
   output.resize(output_size);
-  PointCloud* output_pc = new PointCloud;
-  output_pc->points_ = std::move(output);
-  output_pc->pointcloud_type_ = pc->pointcloud_type_;
-  output_pc->size_ = output_points_count;
-  output_pc->point_size_ = pc->point_size_;
+  auto output_pc = std::make_unique<PointCloud>(pc.type(), output_points_count);
+  output_pc->points() = std::move(output);
   return output_pc;
 }
 
@@ -57,7 +64,7 @@ void CropBoxFilter::SetParams(const FilterParametr& param)
   new_param.max_y = param.GetParam("max_y", new_param.max_y);
   new_param.min_z = param.GetParam("min_z", new_param.min_z);
   new_param.max_z = param.GetParam("max_z", new_param.max_z);
-  new_param.negative = static_cast<bool>(param.GetParam("max_z", param_.negative ? 1 : 0));
+  new_param.negative = static_cast<bool>(param.GetParam("negative", param_.negative ? 1 : 0));
   if (
     new_param.min_x != 0 && new_param.max_x != 0 &&
     new_param.min_y != 0 && new_param.max_y != 0 &&
@@ -67,10 +74,19 @@ void CropBoxFilter::SetParams(const FilterParametr& param)
       param_.min_y != new_param.min_y || param_.max_y != new_param.max_y ||
       param_.min_z != new_param.min_z || param_.max_z != new_param.max_z ||
       param_.negative != new_param.negative) {
+
       logger_.log("[paramCallback] Setting the minimum point to: " +
-        std::to_string(new_param.min_x) + " " + std::to_string(new_param.min_y) + " " + std::to_string(new_param.min_z));
+        std::to_string(new_param.min_x) + " " + 
+        std::to_string(new_param.min_y) + " " + 
+        std::to_string(new_param.min_z));
+
       logger_.log("[paramCallback] Setting the maximum point to: " +
-        std::to_string(new_param.max_x) + " " + std::to_string(new_param.max_y) + " " + std::to_string(new_param.max_z));
+        std::to_string(new_param.max_x) + " " + 
+        std::to_string(new_param.max_y) + " " + 
+        std::to_string(new_param.max_z));
+
+      std::string negative_msg = "[paramCallback] Setting the filter negative flag to: ";
+      negative_msg += (new_param.negative ? "true" : "false");
       logger_.log("[paramCallback] Setting the filter negative flag to: " + new_param.negative ? "true" : "false");
       param_ = new_param;
     }
